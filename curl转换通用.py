@@ -1,150 +1,50 @@
-import re
+import requests
 import json
 import pyperclip
-from urllib.parse import urlparse
 
+url = "https://serverapi.trumanwl.com/api/curl-convert"
 
-def parse_curl_command(curl_command):
-    """解析curl命令的各个组件"""
-    result = {
-        'method': 'GET',
-        'url': '',
-        'headers': {},
-        'data': None,
-    }
+headers = {
+    "sec-ch-ua-platform": '"Windows"',
+    "Referer": "https://trumanwl.com/",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    "sec-ch-ua": '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
+    "Content-Type": "application/json",
+    "sec-ch-ua-mobile": "?0",
+    "Origin": "https://trumanwl.com"
+}
 
-    # 提取URL
-    url_match = re.search(r"curl '([^']*)'", curl_command)
-    if url_match:
-        result['url'] = url_match.group(1)
-        if any(ext in result['url'].lower() for ext in ['.ico', '.png', '.jpg', '.jpeg', '.gif', '.css', '.js']):
-            return None
-        # 已去除根据URL判断API类型的代码
+# 从剪贴板获取最新的curl数据
+clipboard_curl = pyperclip.paste()
 
-    # 提取请求方法
-    if "-X 'POST'" in curl_command or "--data" in curl_command:
-        result['method'] = 'POST'
-    elif "-X 'OPTIONS'" in curl_command:
-        return None
+data = {
+    "language": "python",
+    "content": clipboard_curl
+}
 
-    # 提取headers
-    headers_matches = re.finditer(r"-H '([^:]+): ([^']+)'", curl_command)
-    essential_headers = {
-        'accept': None,
-        'accept-language': None,
-        'authorization': None,
-        'content-type': None,
-        'origin': None,
-        'referer': None
-    }
+# 发送 POST 请求
+response = requests.post(url, headers=headers, json=data)
 
-    for match in headers_matches:
-        key = match.group(1).lower()
-        value = match.group(2)
-        if key in essential_headers:
-            result['headers'][key] = value
-
-    # 提取data
-    data_match = re.search(r"--data-raw '([^']*)'", curl_command)
-    if data_match:
-        try:
-            data_str = data_match.group(1).replace('\\"', '"')
-            result['data'] = json.loads(data_str)
-        except json.JSONDecodeError:
-            result['data'] = data_match.group(1)
-
-    return result
-
-
-def generate_python_code(curl_components):
-    """生成Python代码"""
-    if not curl_components:
-        return ""
-
-    code_lines = ['import requests\n']
-
-    # 生成headers
-    if curl_components['headers']:
-        code_lines.append('headers = {')
-        for key, value in curl_components['headers'].items():
-            code_lines.append(f"    '{key}': '{value}',")
-        code_lines.append('}\n')
-
-    # 生成data
-    if curl_components['data']:
-        code_lines.append('json_data = {')
-        if isinstance(curl_components['data'], dict):
-            for key, value in sorted(curl_components['data'].items()):
-                if isinstance(value, str):
-                    code_lines.append(f"    '{key}': '{value}',")
-                else:
-                    code_lines.append(f"    '{key}': {value},")
-        code_lines.append('}\n')
-
-    # 生成请求
-    request_line = f"response = requests.{curl_components['method'].lower()}('{curl_components['url']}'"
-    if curl_components['headers']:
-        request_line += ', headers=headers'
-    if curl_components['data']:
-        request_line += ', json=json_data'
-    request_line += ')'
-    code_lines.append(request_line)
-
-    # 添加打印响应结果
-    code_lines.append('print(response.json())')
-
-    return '\n'.join(code_lines)
-
-
-def process_curl_command(curl_command):
-    """处理curl命令"""
-    commands = re.split(r';(?=\s*curl)', curl_command)
-
-    # 只处理第一个有效的请求
-    for command in commands:
-        if not command.strip():
-            continue
-
-        components = parse_curl_command(command.strip())
-        if components and components['data']:  # 优先处理带有data的请求
-            return generate_python_code(components)
-
-    # 如果没有带data的请求，处理第一个有效请求
-    for command in commands:
-        if not command.strip():
-            continue
-
-        components = parse_curl_command(command.strip())
-        if components:
-            return generate_python_code(components)
-
-    return ""
-
-
-def convert_curl_to_python():
-    """主函数：从剪贴板读取curl命令并转换为Python代码"""
-    try:
-        curl_command = pyperclip.paste()
-
-        if not curl_command.strip().startswith('curl'):
-            print("错误：剪贴板内容不是有效的curl命令")
-            return
-
-        python_code = process_curl_command(curl_command)
-
-        if not python_code:
-            print("没有找到有效的请求")
-            return
-
-        pyperclip.copy(python_code)
-
-        print("转换结果:")
-        print(python_code)
-        print("\n代码已复制到剪贴板")
-
-    except Exception as e:
-        print(f"转换过程中发生错误: {e}")
-
-
-if __name__ == "__main__":
-    convert_curl_to_python()
+try:
+    # 解析响应的 JSON 数据
+    response_data = response.json()
+    # 获取 content 字段
+    content = response_data["content"]
+    # 删除注释代码
+    lines = content.splitlines()
+    non_comment_lines = []
+    for line in lines:
+        stripped_line = line.strip()
+        if not stripped_line.startswith('#'):
+            non_comment_lines.append(line)
+    content_without_comments = '\n'.join(non_comment_lines)
+    # 构建要打印和复制的内容
+    output = f"{content_without_comments}\nprint(response.text)"
+    # 打印内容
+    print(output)
+    # 将结果复制到剪贴板
+    pyperclip.copy(output)
+except json.JSONDecodeError:
+    print("无法解析响应的JSON数据。")
+except KeyError:
+    print("响应中没有 'content' 字段。")
