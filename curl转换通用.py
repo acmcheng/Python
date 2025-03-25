@@ -39,7 +39,10 @@ try:
             non_comment_lines.append(line)
     content_without_comments = '\n'.join(non_comment_lines)
     # 构建要打印和复制的内容
-    output = f"{content_without_comments}\nprint(response.text)"
+    # output = f"{content_without_comments}\nprint(response.text)"
+
+    output = f"import json\n{content_without_comments}\nparsed_data = json.loads(response.text)\nformatted_json = json.dumps(parsed_data, indent=4, ensure_ascii=False)\nprint(formatted_json)"
+
     # 打印内容
     print(output)
     # 将结果复制到剪贴板
