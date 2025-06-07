@@ -8,8 +8,8 @@ from pyppeteer import launch
 
 # QingLong面板配置
 QL_HOST = "http://localhost:5700"  # 青龙面板地址
-QL_USERNAME = "chengming"  # 青龙面板用户名
-QL_PASSWORD = "19960902"  # 青龙面板密码
+QL_USERNAME = ""  # 青龙面板用户名
+QL_PASSWORD = ""  # 青龙面板密码
 QL_ENV_NAME = "JD_COOKIE"  # 环境变量名称
 
 def get_ql_token():
